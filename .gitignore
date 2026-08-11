@@ -1,0 +1,13 @@
+# Build outputs
+build/
+bin/
+*.exe
+*.out
+
+# Local runtime data
+highscore.txt
+
+# Editor and OS files
+.vscode/
+.DS_Store
+Thumbs.db
