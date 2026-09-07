@@ -14,6 +14,26 @@ endfunction()
 
 find_package(Curses REQUIRED)
 
+add_library(puyopuyo_ui
+    src/ui/ncurses_input.cpp
+    src/ui/ncurses_renderer.cpp
+    src/ui/ncurses_session.cpp
+)
+
+target_include_directories(puyopuyo_ui
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+    PRIVATE
+        ${CURSES_INCLUDE_DIRS}
+)
+
+target_link_libraries(puyopuyo_ui
+    PRIVATE
+        ${CURSES_LIBRARIES}
+)
+
+enable_warnings(puyopuyo_ui)
+
 add_library(puyopuyo_domain
     src/domain/board.cpp
     src/domain/game.cpp
@@ -27,19 +47,27 @@ target_include_directories(puyopuyo_domain
 
 enable_warnings(puyopuyo_domain)
 
-add_executable(puyopuyo
-    src/puyo.cpp
+add_library(puyopuyo_storage
+    src/storage/high_score_store.cpp
 )
 
-target_include_directories(puyopuyo
-    PRIVATE
-        ${CURSES_INCLUDE_DIRS}
+target_include_directories(puyopuyo_storage
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
+
+enable_warnings(puyopuyo_storage)
+
+add_executable(puyopuyo
+    src/main.cpp
 )
 
 target_link_libraries(puyopuyo
     PRIVATE
         ${CURSES_LIBRARIES}
         puyopuyo_domain
+        puyopuyo_ui
+        puyopuyo_storage
 )
 
 enable_warnings(puyopuyo)
@@ -93,6 +121,22 @@ if(BUILD_TESTING)
     add_test(
         NAME puyopuyo_game_tests
         COMMAND puyopuyo_game_tests
+    )
+
+    add_executable(puyopuyo_high_score_store_tests
+        tests/high_score_store_test.cpp
+    )
+
+    target_link_libraries(puyopuyo_high_score_store_tests
+        PRIVATE
+            puyopuyo_storage
+    )
+
+    enable_warnings(puyopuyo_high_score_store_tests)
+
+    add_test(
+        NAME puyopuyo_high_score_store_tests
+        COMMAND puyopuyo_high_score_store_tests
     )
 
 endif()

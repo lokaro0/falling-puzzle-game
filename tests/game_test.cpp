@@ -312,6 +312,46 @@ void test_fall_is_rejected_when_a_fixed_piece_is_below() {
         "Rejected movement must preserve the pivot column.");
 }
 
+void test_piece_separates_after_one_side_lands() {
+    puyopuyo::Game game(6, 2);
+
+    spawn_and_lock(
+        game,
+        puyopuyo::Piece{
+            puyopuyo::Position{4, 0},
+            puyopuyo::Color::Green,
+            puyopuyo::Color::Yellow,
+            puyopuyo::Direction::Down,
+        }
+    );
+
+    const bool spawned = game.try_spawn(
+        puyopuyo::Piece{
+            puyopuyo::Position{3, 0},
+            puyopuyo::Color::Red,
+            puyopuyo::Color::Blue,
+            puyopuyo::Direction::Right,
+        }
+    );
+
+    require(spawned, "The test piece must spawn.");
+
+    require(
+        game.fall_one_row() == puyopuyo::FallResult::Locked,
+        "The piece must lock when its left side is blocked."
+    );
+
+    require(
+        game.board().at(puyopuyo::Position{3, 0}) == puyopuyo::Color::Red,
+        "The blocked puyo must remain above the obstacle."
+    );
+
+    require(
+        game.board().at(puyopuyo::Position{5, 1}) == puyopuyo::Color::Blue,
+        "The unblocked puyo must fall to the bottom."
+    );
+}
+
 }  // namespace
 
 int main() {
@@ -326,6 +366,7 @@ int main() {
         test_resolve_counts_each_erased_group();
         test_resolve_counts_groups_created_after_gravity();
         test_fall_is_rejected_when_a_fixed_piece_is_below();
+        test_piece_separates_after_one_side_lands();
     } catch (const std::exception& error) {
         std::cerr << "Test failed: " << error.what() << '\n';
         return 1;

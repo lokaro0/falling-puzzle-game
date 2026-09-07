@@ -5,7 +5,7 @@ bin/
 *.out
 
 # Local runtime data
-highscore.txt
+data/high_score.txt
 
 # Editor and OS files
 .vscode/

@@ -63,6 +63,7 @@ FallResult Game::fall_one_row() {
     }
 
     lock_active_piece();
+    apply_gravity();
     return FallResult::Locked;
 }
 
