@@ -1,5 +1,7 @@
 # PuyoPuyo
 
+[![CI](https://github.com/lokaro0/falling-puzzle-game/actions/workflows/ci.yml/badge.svg)](https://github.com/lokaro0/falling-puzzle-game/actions/workflows/ci.yml)
+
 C++ と ncurses で制作した、同色のぷよを4個以上つなげて消す、ぷよぷよ風の落下パズルゲームです。
 ゲームルール・画面表示・入力処理・ハイスコア保存を分離し、ゲームロジックを単体テストできる構成へリファクタリングしました。
 
