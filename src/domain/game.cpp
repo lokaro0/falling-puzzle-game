@@ -109,7 +109,7 @@ ResolutionResult Game::resolve() {
         }
 
         for (const std::vector<Position>& group : erasable_groups) {
-            ++result.chain_count;
+            ++result.erased_group_count;
             result.erased_count += static_cast<int>(group.size());
 
             for (const Position position : group) {

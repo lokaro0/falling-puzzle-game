@@ -174,7 +174,7 @@ void test_resolve_does_not_erase_a_group_of_three() {
     const puyopuyo::ResolutionResult result = game.resolve();
 
     require(result.erased_count == 0, "Three puyos must not be erased.");
-    require(result.chain_count == 0, "No group must mean no chain count.");
+    require(result.erased_group_count == 0, "No group must mean no erased group count.");
     require(game.score() == 0, "No erased puyos must add no score.");
 
     require(
@@ -225,8 +225,8 @@ void test_resolve_counts_each_erased_group() {
 
     require(result.erased_count == 8, "Two groups must erase eight puyos.");
     require(
-        result.chain_count == 2,
-        "Two erased groups must increment the chain count twice.");
+        result.erased_group_count == 2,
+        "Two erased groups must increment the erased group count twice.");
     require(game.score() == 8, "Erased puyos must be added to the score.");
 
     require(
@@ -276,8 +276,8 @@ void test_resolve_counts_groups_created_after_gravity() {
 
     require(result.erased_count == 8, "Two erased groups must erase eight puyos.");
     require(
-        result.chain_count == 2,
-        "A group erased after gravity must increment the chain count.");
+        result.erased_group_count == 2,
+        "A group erased after gravity must increment the erased group count.");
     require(game.score() == 8, "All erased puyos must be added to the score.");
 
     require(

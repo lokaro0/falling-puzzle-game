@@ -16,7 +16,7 @@ enum class FallResult {
 
 struct ResolutionResult {
     int erased_count = 0;
-    int chain_count = 0;
+    int erased_group_count = 0;
 };
 
 class Game final {
