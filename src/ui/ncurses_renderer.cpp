@@ -36,6 +36,19 @@ int color_pair(Color color) noexcept {
     return 0;
 }
 
+bool is_hidden(
+    Position position,
+    const std::vector<Position>& hidden_positions
+) {
+    for (const Position hidden_position : hidden_positions) {
+        if (same_position(position, hidden_position)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 chtype cell_symbol(Color color) noexcept {
     switch (color) {
     case Color::None:
@@ -83,7 +96,12 @@ Color displayed_color(const Game& game, Position position) {
 
 }  // namespace
 
-void NcursesRenderer::render(const Game& game, int high_score) const {
+void NcursesRenderer::render(
+    const Game& game,
+    int high_score,
+    const Piece& next_piece,
+    const std::vector<Position>& hidden_positions
+) const {
     erase();
 
     const Board& board = game.board();
@@ -96,7 +114,9 @@ void NcursesRenderer::render(const Game& game, int high_score) const {
     for (int row = 0; row < board.rows(); ++row) {
         for (int col = 0; col < board.cols(); ++col) {
             const Position position{row, col};
-            const Color color = displayed_color(game, position);
+            const Color color = is_hidden(position, hidden_positions)
+                ? Color::None
+                : displayed_color(game, position);
 
             attrset(COLOR_PAIR(color_pair(color)));
             mvaddch(kCellTop + row, kCellLeft + col * 2, cell_symbol(color));
@@ -106,6 +126,16 @@ void NcursesRenderer::render(const Game& game, int high_score) const {
     attrset(COLOR_PAIR(0));
     mvprintw(0, 1, "Score: %d", game.score());
     mvprintw(0, 17, "High score: %d", high_score);
+
+    mvaddstr(2, 17, "Next:");
+
+    attrset(COLOR_PAIR(color_pair(next_piece.pivot_color)));
+    mvaddch(2, 22, cell_symbol(next_piece.pivot_color));
+
+    attrset(COLOR_PAIR(color_pair(next_piece.satellite_color)));
+    mvaddch(2, 23, cell_symbol(next_piece.satellite_color));
+
+    attrset(COLOR_PAIR(0));
     if (game.is_game_over()) {
         mvaddstr(4, 17, "Game over");
         mvaddstr(5, 17, "Press Q to quit");

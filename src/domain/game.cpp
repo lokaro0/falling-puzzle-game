@@ -30,13 +30,24 @@ bool Game::try_spawn(Piece piece) {
         return false;
     }
 
-    if (!can_place(piece)) {
-        game_over_ = true;
-        return false;
+    if (can_place(piece)) {
+        active_piece_ = piece;
+        return true;
     }
 
-    active_piece_ = piece;
-    return true;
+    if (piece.pivot_position.row == 0
+        && piece.satellite_direction == Direction::Right) {
+            for (int col = 0; col < board_.cols() - 1; ++col) {
+                piece.pivot_position = Position{0, col};
+
+                if (can_place(piece)) {
+                    active_piece_ = piece;
+                    return true;
+                }
+            }
+        }
+    game_over_ = true;
+    return false;
 }
 
 bool Game::try_move(int row_delta, int col_delta) {
@@ -63,7 +74,6 @@ FallResult Game::fall_one_row() {
     }
 
     lock_active_piece();
-    apply_gravity();
     return FallResult::Locked;
 }
 
@@ -98,7 +108,10 @@ bool Game::lock_active_piece() {
     return true;
 }
 
-ResolutionResult Game::resolve() {
+ResolutionResult Game::resolve(
+    const std::function<void(const std::vector<Position>&)>& on_erase_group,
+    const std::function<void()>& on_gravity_step
+) {
     ResolutionResult result;
 
     while (true) {
@@ -109,6 +122,10 @@ ResolutionResult Game::resolve() {
         }
 
         for (const std::vector<Position>& group : erasable_groups) {
+            if (on_erase_group) {
+                on_erase_group(group);
+            }
+
             ++result.erased_group_count;
             result.erased_count += static_cast<int>(group.size());
 
@@ -117,7 +134,11 @@ ResolutionResult Game::resolve() {
             }
         }
 
-        apply_gravity();
+        while (apply_gravity_one_row()) {
+            if (on_gravity_step) {
+                on_gravity_step();
+            }
+        }
     }
 
     score_ += result.erased_count;
@@ -199,27 +220,26 @@ std::vector<std::vector<Position>> Game::find_erasable_groups() const {
     return erasable_groups;
 }
 
-void Game::apply_gravity() {
-    for (int col = 0; col < board_.cols(); ++col) {
-        int write_row = board_.rows() - 1;
+bool Game::apply_gravity_one_row() {
+    bool moved = false;
 
-        for (int read_row = board_.rows() - 1; read_row >= 0; --read_row) {
-            const Position read_position{read_row, col};
-            const Color color = board_.at(read_position);
+    for (int row = board_.rows() - 2; row >= 0; --row) {
+        for (int col = 0; col < board_.cols(); ++col) {
+            const Position current{row, col};
+            const Position below{row + 1, col};
 
-            if (color == Color::None) {
+            if (board_.at(current) == Color::None
+                || board_.at(below) != Color::None) {
                 continue;
             }
 
-            const Position write_position{write_row, col};
-            if (write_position.row != read_position.row) {
-                board_.at(write_position) = color;
-                board_.at(read_position) = Color::None;
-            }
-
-            --write_row;
+            board_.at(below) = board_.at(current);
+            board_.at(current) = Color::None;
+            moved = true;
         }
     }
+
+    return moved;
 }
 
 }  // namespace puyopuyo

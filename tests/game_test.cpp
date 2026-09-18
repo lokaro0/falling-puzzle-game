@@ -152,6 +152,57 @@ void test_blocked_spawn_ends_the_game() {
     require(game.is_game_over(), "A blocked spawn must end the game.");
 }
 
+void test_spawn_searches_top_row_when_center_is_blocked() {
+    Game game(4, 6);
+
+    spawn_and_lock(
+        game,
+        create_piece(Position{0, 2}, Direction::Right));
+
+    require(
+        game.try_spawn(create_piece(Position{0, 2}, Direction::Right)),
+        "A piece must spawn elsewhere when the center is blocked.");
+
+    require(
+        game.active_piece().has_value(),
+        "The fallback spawn must create an active piece.");
+
+    require(
+        game.active_piece()->pivot_position.row == 0
+            && game.active_piece()->pivot_position.col == 0,
+        "The fallback spawn must use the first available top-row position.");
+
+    require(
+        !game.is_game_over(),
+        "A successful fallback spawn must not end the game.");
+}
+
+void test_spawn_ends_game_when_top_row_has_no_available_pair() {
+    Game game(4, 6);
+
+    spawn_and_lock(
+        game,
+        create_piece(Position{0, 0}, Direction::Right));
+    spawn_and_lock(
+        game,
+        create_piece(Position{0, 2}, Direction::Right));
+    spawn_and_lock(
+        game,
+        create_piece(Position{0, 4}, Direction::Right));
+
+    require(
+        !game.try_spawn(create_piece(Position{0, 2}, Direction::Right)),
+        "A piece must not spawn when the top row has no available pair.");
+
+    require(
+        !game.active_piece().has_value(),
+        "A failed spawn must not create an active piece.");
+
+    require(
+        game.is_game_over(),
+        "A completely blocked top row must end the game.");
+}
+
 void test_resolve_does_not_erase_a_group_of_three() {
     Game game(4, 4);
 
@@ -341,6 +392,9 @@ void test_piece_separates_after_one_side_lands() {
         "The piece must lock when its left side is blocked."
     );
 
+    while (game.apply_gravity_one_row()) {
+    }
+
     require(
         game.board().at(puyopuyo::Position{3, 0}) == puyopuyo::Color::Red,
         "The blocked puyo must remain above the obstacle."
@@ -350,6 +404,46 @@ void test_piece_separates_after_one_side_lands() {
         game.board().at(puyopuyo::Position{5, 1}) == puyopuyo::Color::Blue,
         "The unblocked puyo must fall to the bottom."
     );
+}
+
+void test_gravity_moves_puyos_one_row_at_a_time() {
+    Game game(4, 2);
+
+    spawn_and_lock(
+        game,
+        create_piece(
+            Position{0, 0},
+            Direction::Right,
+            Color::Red,
+            Color::Blue));
+
+    require(
+        game.apply_gravity_one_row(),
+        "Gravity must move floating puyos.");
+
+    require(
+        game.board().at(Position{0, 0}) == Color::None,
+        "The original red position must become empty.");
+    require(
+        game.board().at(Position{0, 1}) == Color::None,
+        "The original blue position must become empty.");
+
+    require(
+        game.board().at(Position{1, 0}) == Color::Red,
+        "The red puyo must fall exactly one row.");
+    require(
+        game.board().at(Position{1, 1}) == Color::Blue,
+        "The blue puyo must fall exactly one row.");
+
+    require(
+        game.apply_gravity_one_row(),
+        "Gravity must move puyos to the second row.");
+    require(
+        game.apply_gravity_one_row(),
+        "Gravity must move puyos to the bottom row.");
+    require(
+        !game.apply_gravity_one_row(),
+        "Gravity must stop when no puyo can fall.");
 }
 
 }  // namespace
@@ -362,11 +456,14 @@ int main() {
         test_lock_places_both_colors_on_the_board();
         test_fall_moves_then_locks_a_piece();
         test_blocked_spawn_ends_the_game();
+        test_spawn_searches_top_row_when_center_is_blocked();
+        test_spawn_ends_game_when_top_row_has_no_available_pair();
         test_resolve_does_not_erase_a_group_of_three();
         test_resolve_counts_each_erased_group();
         test_resolve_counts_groups_created_after_gravity();
         test_fall_is_rejected_when_a_fixed_piece_is_below();
         test_piece_separates_after_one_side_lands();
+        test_gravity_moves_puyos_one_row_at_a_time();
     } catch (const std::exception& error) {
         std::cerr << "Test failed: " << error.what() << '\n';
         return 1;
