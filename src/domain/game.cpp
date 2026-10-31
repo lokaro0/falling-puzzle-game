@@ -108,31 +108,46 @@ bool Game::lock_active_piece() {
     return true;
 }
 
+ResolutionResult Game::erase_once(
+    const std::function<void(const std::vector<Position>&)>&
+        on_erase_group
+) {
+    ResolutionResult result;
+    const auto erasable_groups = find_erasable_groups();
+
+    for (const auto& group : erasable_groups) {
+        if (on_erase_group) {
+            on_erase_group(group);
+        }
+
+        ++result.erased_group_count;
+        result.erased_count += static_cast<int>(group.size());
+
+        for (const Position position : group) {
+            board_.at(position) = Color::None;
+        }
+    }
+
+    score_ += result.erased_count;
+    return result;
+}
+
 ResolutionResult Game::resolve(
-    const std::function<void(const std::vector<Position>&)>& on_erase_group,
+    const std::function<void(const std::vector<Position>&)>&
+        on_erase_group,
     const std::function<void()>& on_gravity_step
 ) {
     ResolutionResult result;
 
     while (true) {
-        const auto erasable_groups = find_erasable_groups();
+        const auto step = erase_once(on_erase_group);
 
-        if (erasable_groups.empty()) {
+        if (step.erased_count == 0) {
             break;
         }
 
-        for (const std::vector<Position>& group : erasable_groups) {
-            if (on_erase_group) {
-                on_erase_group(group);
-            }
-
-            ++result.erased_group_count;
-            result.erased_count += static_cast<int>(group.size());
-
-            for (const Position position : group) {
-                board_.at(position) = Color::None;
-            }
-        }
+        result.erased_count += step.erased_count;
+        result.erased_group_count += step.erased_group_count;
 
         while (apply_gravity_one_row()) {
             if (on_gravity_step) {
@@ -141,7 +156,6 @@ ResolutionResult Game::resolve(
         }
     }
 
-    score_ += result.erased_count;
     return result;
 }
 

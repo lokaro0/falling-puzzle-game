@@ -2,13 +2,64 @@
 
 [![CI](https://github.com/lokaro0/falling-puzzle-game/actions/workflows/ci.yml/badge.svg)](https://github.com/lokaro0/falling-puzzle-game/actions/workflows/ci.yml)
 
-C++17とncursesで実装した、ターミナル上で動作する落ちものパズルゲームです。
+C++17で実装した、同色のブロックを4個以上つなげて消す落ちものパズルゲームです。Windows向けのraylib GUI版と、Linux／WSL向けのncurses版があります。
 
 動作する初版コードを分析し、ゲームロジック・画面表示・入力処理・ハイスコア保存を分離しました。ゲームロジックをncursesやファイルI/Oから独立させることで、自動テスト可能な構成に改善しています。
 
-![ゲーム画面](assets/gameplay.png)
+## Windows GUI版（開発途中）
 
-## 主な特徴
+### ダウンロードと起動
+
+1. [Releases](https://github.com/lokaro0/falling-puzzle-game/releases)からWindows版のZIPをダウンロードします。
+2. ZIPをすべて展開します。
+3. 同梱DLLを実行ファイルと同じフォルダに置いたまま、`falling_puzzle_gui.exe`を起動します。
+
+対応環境はWindows 11 64bitです。開発環境のインストールは不要です。
+
+### 操作
+
+| 場面 | キーと動作 |
+|---|---|
+| メニュー・結果・終了確認 | `↑` / `↓`または`W` / `S`で選択、`Enter`で決定 |
+| プレイ中 | `←` / `A`で左、`→` / `D`で右、`↓` / `S`で1段落下 |
+| 回転 | `R` / `Z`で時計回りに回転 |
+| プレイ中の終了確認 | `Esc`またはウィンドウの×。Yesで終了、Noまたは`Esc`で再開 |
+| High Score・Tutorialの仮画面 | `Esc`でタイトルへ戻る |
+| Game Over | 新しいキー入力で結果画面へ進む。演出中もスキップ可能 |
+
+移動と手動落下はキーを押すごとに1回動作します。終了確認中はゲームの進行が止まります。結果画面のRetryで再挑戦、Titleでタイトルへ戻れます。
+
+### 記録と現在の制限
+
+ハイスコアは`%LOCALAPPDATA%\FallingPuzzleGame\high_score.txt`へ保存され、次回起動時も保持されます。`High score storage unavailable`と表示された場合は、保存または読み込みに失敗しています。
+
+- 画面表示は英語です。
+- High Score専用画面とTutorialは仮画面です。最高得点はタイトル・プレイ・結果画面で確認できます。
+- 得点は消去個数の累計です。連鎖倍率・最大連鎖表示・効果音・消去前の点滅は未実装です。
+- 重力処理の前後に短い待ち時間があります。
+
+配布ZIPに第三者ソフトウェアのライセンス資料を同梱しています。
+
+### ソースからのビルド（Windows／MinGW-w64）
+
+C++17対応のMinGW-w64、CMake 3.20以上、Gitが必要です。リポジトリのルートで実行してください。raylib 5.5の固定コミットを初回設定時に取得するため、インターネット接続が必要です。
+
+```powershell
+cmake -S . -B build/windows-gui -G "MinGW Makefiles" -DBUILD_NCURSES=OFF -DBUILD_GUI=ON -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build build/windows-gui --parallel 4
+ctest --test-dir build/windows-gui --output-on-failure
+.\build\windows-gui\falling_puzzle_gui.exe
+```
+
+MinGW-w64の`bin`をPATHへ追加してください。現環境では日本語を含むパスでビルド時の問題があったため、`C:\puyopuyo`のような英数字のパスを使用しています。
+
+## ncurses版
+
+以下の特徴・実行手順・操作方法はターミナル版の説明です。
+
+![ncurses版のゲーム画面](assets/gameplay.png)
+
+### 主な特徴
 
 - ランダムな2個組ブロックの生成
 - 次に出現する2個組ブロックの表示
@@ -23,7 +74,7 @@ C++17とncursesで実装した、ターミナル上で動作する落ちもの�
 - CTestによるゲームロジックと保存処理の自動テスト
 - GitHub ActionsによるUbuntu上での自動ビルド・テスト
 
-## 使用技術
+### 使用技術
 
 - C++17
 - CMake 3.20以上
@@ -32,9 +83,9 @@ C++17とncursesで実装した、ターミナル上で動作する落ちもの�
 - GitHub Actions
 - GCC／Clang
 
-## ビルドと実行
+### ビルドと実行
 
-### 必要な環境
+#### 必要な環境
 
 - C++17対応コンパイラ
 - CMake 3.20以上
@@ -62,7 +113,7 @@ cmake --build build/ubuntu --parallel
 ./build/ubuntu/puyopuyo
 ```
 
-## 操作方法
+### 操作方法
 
 | キー | 操作 |
 |---|---|
@@ -76,7 +127,7 @@ cmake --build build/ubuntu --parallel
 
 ## テスト
 
-ビルド後、次のコマンドで全テストを実行できます。
+ゲームロジックと保存処理のテストは両版で共通です。ncurses版のビルド後は次で実行します。GUI版のコマンドは上記Windowsビルド手順を参照してください。
 
 ```bash
 ctest --test-dir build/ubuntu --output-on-failure
@@ -99,7 +150,8 @@ GitHub Actionsでは、`main`へのpushとPull Requestごとに、Ubuntu 24.04�
 
 ```text
 src/
-├─ main.cpp                 # 各要素を組み合わせてゲーム進行を制御
+├─ main.cpp                 # ncurses版のゲーム進行
+├─ gui_main.cpp             # raylib版の画面遷移、入力、描画、ゲーム進行
 ├─ domain/                  # ncursesに依存しないゲームルール
 │  ├─ board.*               # 盤面
 │  ├─ color.hpp             # ブロックの色
@@ -122,7 +174,7 @@ src/
 - ハイスコアのファイルI/Oをゲーム規則から分離する
 - `main`には入力、更新、描画を組み合わせる役割だけを持たせる
 
-詳しい構成は[アーキテクチャ資料](docs/architecture.md)に記録しています。
+既存の層構造は[アーキテクチャ資料](docs/architecture.md)、GUI版の構成と実装計画は[基本設計](docs/gui-implementation.md)、ライブラリ選定理由は[ADR](docs/decisions/001-gui-library.md)に記録しています。
 
 ## 初版を基準にした改善
 

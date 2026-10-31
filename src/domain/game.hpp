@@ -32,6 +32,10 @@ public:
         const std::function<void(const std::vector<Position>&)>& on_erase_group = {},
         const std::function<void()>& on_gravity_step = {}
     );
+    [[nodiscard]] ResolutionResult erase_once(
+        const std::function<void(const std::vector<Position>&)>&
+            on_erase_group = {}
+    );
 
     bool try_spawn(Piece piece);
     bool try_move(int row_delta, int col_delta);

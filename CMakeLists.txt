@@ -12,27 +12,32 @@ function(enable_warnings target)
     endif()
 endfunction()
 
-find_package(Curses REQUIRED)
+option(BUILD_NCURSES "Build the terminal game" ON)
+option(BUILD_GUI "Build the raylib game" OFF)
 
-add_library(puyopuyo_ui
-    src/ui/ncurses_input.cpp
-    src/ui/ncurses_renderer.cpp
-    src/ui/ncurses_session.cpp
-)
+if(BUILD_NCURSES)
+    find_package(Curses REQUIRED)
 
-target_include_directories(puyopuyo_ui
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-    PRIVATE
-        ${CURSES_INCLUDE_DIRS}
-)
+    add_library(puyopuyo_ui
+        src/ui/ncurses_input.cpp
+        src/ui/ncurses_renderer.cpp
+        src/ui/ncurses_session.cpp
+    )
 
-target_link_libraries(puyopuyo_ui
-    PRIVATE
-        ${CURSES_LIBRARIES}
-)
+    target_include_directories(puyopuyo_ui
+        PUBLIC
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+        PRIVATE
+            ${CURSES_INCLUDE_DIRS}
+    )
 
-enable_warnings(puyopuyo_ui)
+    target_link_libraries(puyopuyo_ui
+        PRIVATE
+            ${CURSES_LIBRARIES}
+    )
+
+    enable_warnings(puyopuyo_ui)
+endif()
 
 add_library(puyopuyo_domain
     src/domain/board.cpp
@@ -58,19 +63,46 @@ target_include_directories(puyopuyo_storage
 
 enable_warnings(puyopuyo_storage)
 
-add_executable(puyopuyo
-    src/main.cpp
-)
+if(BUILD_NCURSES)
+    add_executable(puyopuyo
+        src/main.cpp
+    )
 
-target_link_libraries(puyopuyo
-    PRIVATE
-        ${CURSES_LIBRARIES}
+    target_link_libraries(puyopuyo
+        PRIVATE
+            ${CURSES_LIBRARIES}
+            puyopuyo_domain
+            puyopuyo_ui
+            puyopuyo_storage
+    )
+
+    enable_warnings(puyopuyo)
+endif()
+
+if(BUILD_GUI)
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/src/gui_main.cpp")
+        message(FATAL_ERROR "Create src/gui_main.cpp before enabling BUILD_GUI")
+    endif()
+
+    enable_language(C)
+    include(FetchContent)
+    set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+    set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(raylib
+        GIT_REPOSITORY https://github.com/raysan5/raylib.git
+        # raylib 5.5: pin the exact commit used in the technical probe.
+        GIT_TAG c1ab645ca298a2801097931d1079b10ff7eb9df8
+    )
+    FetchContent_MakeAvailable(raylib)
+
+    add_executable(falling_puzzle_gui src/gui_main.cpp)
+    target_link_libraries(falling_puzzle_gui PRIVATE
+        raylib
         puyopuyo_domain
-        puyopuyo_ui
         puyopuyo_storage
-)
-
-enable_warnings(puyopuyo)
+    )
+    enable_warnings(falling_puzzle_gui)
+endif()
 
 include(CTest)
 
