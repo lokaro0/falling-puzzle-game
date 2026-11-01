@@ -7,6 +7,8 @@
 #include <exception>
 #include <filesystem>
 #include <optional>
+#include <vector>
+#include <algorithm>
 
 enum class Screen {
     Title,
@@ -19,7 +21,8 @@ enum class Screen {
 
 enum class PlayPhase {
     Falling,
-    Gravity
+    Gravity,
+    Erasing
 };
 
 Color to_draw_color(puyopuyo::Color color) {
@@ -107,6 +110,14 @@ int main() {
     const float gravity_interval = 0.1f;
     float gravity_elapsed = 0.0f;
 
+    const float erase_blink_interval = 0.12f;
+    const int erase_blink_count = 4;
+    const float erase_duration =
+        erase_blink_interval * 2 * erase_blink_count;
+    float erase_elapsed = 0.0f;
+
+    std::vector<std::vector<puyopuyo::Position>> erase_groups;
+
     const float game_over_duration = 0.8f;
     float game_over_elapsed = 0.0f;
 
@@ -165,6 +176,8 @@ int main() {
         fall_elapsed = 0.0f;
         gravity_elapsed = 0.0f;
         game_over_elapsed = 0.0f;
+        erase_elapsed = 0.0f;
+        erase_groups.clear();
 
         new_high_score = false;
 
@@ -305,20 +318,40 @@ int main() {
                     gravity_elapsed = 0.0f;
 
                     if (!game.apply_gravity_one_row()) {
-                        const auto erased = game.erase_once();
+                        erase_groups = game.find_erasable_groups();
 
-                        if (erased.erased_count > 0) {
-                            gravity_elapsed = 0.0f;
-                        } else if (game.try_spawn(next_piece)) {
-                            next_piece = make_random_piece(board_cols, engine);
-                            play_phase = PlayPhase::Falling;
-                            fall_elapsed = 0.0f;
+                        if (!erase_groups.empty()) {
+                            play_phase = PlayPhase::Erasing;
+                            erase_elapsed = 0.0f;
                         } else {
-                            screen = Screen::GameOver;
-                            game_over_elapsed = 0.0f;
-                            while (GetKeyPressed() != 0) {}
+                            // 空の対象を渡し、連鎖数をリセットする
+                            (void)game.erase_once(erase_groups);
+
+                            if (game.try_spawn(next_piece)) {
+                                next_piece = make_random_piece(board_cols, engine);
+                                play_phase = PlayPhase::Falling;
+                                fall_elapsed = 0.0f;
+                            } else {
+                                screen = Screen::GameOver;
+                                game_over_elapsed = 0.0f;
+
+                                while (GetKeyPressed() != 0) {
+                                }
+                            }
                         }
                     }
+                }
+            } else if (play_phase == PlayPhase::Erasing) {
+                erase_elapsed += delta_time;
+
+                if (erase_elapsed >= erase_duration) {
+                    (void)game.erase_once(erase_groups);
+
+                    erase_groups.clear();
+                    erase_elapsed = 0.0f;
+
+                    play_phase = PlayPhase::Gravity;
+                    gravity_elapsed = 0.0f;
                 }
             }
         } else if (screen == Screen::GameOver) {
@@ -423,10 +456,34 @@ int main() {
                     const auto color = board.at({row, col});
 
                     if (color != puyopuyo::Color::None) {
-                        DrawCircle(
-                            x + cell_size / 2, y + cell_size / 2,
-                            radius, to_draw_color(color)
-                        );
+                        bool hide_puyo = false;
+
+                        if (play_phase == PlayPhase::Erasing) {
+                            const int blink_step =
+                                static_cast<int>(erase_elapsed / erase_blink_interval);
+
+                            if (blink_step % 2 == 1) {
+                                for (const auto& group : erase_groups) {
+                                    for (const auto& position : group) {
+                                        if (position.row == row && position.col == col) {
+                                            hide_puyo = true;
+                                            break;
+                                        }
+                                    }
+
+                                    if (hide_puyo) {
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!hide_puyo) {
+                            DrawCircle(
+                                x + cell_size / 2, y + cell_size / 2,
+                                radius, to_draw_color(color)
+                            );
+                        }
                     }
                 }
             }
@@ -457,6 +514,69 @@ int main() {
                     satellite_x, satellite_y, radius,
                     to_draw_color(piece.satellite_color)
                 );
+            }
+
+            if (play_phase == PlayPhase::Erasing && !erase_groups.empty()) {
+                const int chain = game.current_chain() + 1;
+
+                if (chain >= 2) {
+                    std::size_t selected = 0;
+                    int selected_top = board_rows;
+
+                    for (std::size_t i = 0; i < erase_groups.size(); ++i) {
+                        int top = board_rows;
+
+                        for (const auto& position : erase_groups[i]) {
+                            top = std::min(top, position.row);
+                        }
+
+                        if (i == 0
+                            || erase_groups[i].size() > erase_groups[selected].size()
+                            || (erase_groups[i].size() == erase_groups[selected].size()
+                                && top < selected_top)) {
+                            selected = i;
+                            selected_top = top;
+                        }
+                    }
+
+                    int left = board_cols;
+                    int right = 0;
+
+                    for (const auto& position : erase_groups[selected]) {
+                        left = std::min(left, position.col);
+                        right = std::max(right, position.col);
+                    }
+
+                    const char* chain_text = TextFormat("%i CHAIN!", chain);
+                    const int font_size = 32;
+                    const int text_width = MeasureText(chain_text, font_size);
+
+                    const int center_x =
+                        board_x + (left + right + 1) * cell_size / 2;
+
+                    const int text_x = std::clamp(
+                        center_x - text_width / 2,
+                        8,
+                        GetScreenWidth() - text_width - 8
+                    );
+
+                    const int text_y = std::max(
+                        8,
+                        board_y + selected_top * cell_size - font_size - 8
+                    );
+
+                    DrawText(
+                        chain_text,
+                        text_x + 2, text_y + 2,
+                        font_size, BLACK
+                    );
+
+                    DrawText(
+                        chain_text,
+                        text_x, text_y,
+                        font_size, MAGENTA
+                    );
+                }
             }
 
             DrawText("Next", 420, 80, 28, RAYWHITE);

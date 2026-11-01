@@ -278,7 +278,7 @@ void test_resolve_counts_each_erased_group() {
     require(
         result.erased_group_count == 2,
         "Two erased groups must increment the erased group count twice.");
-    require(game.score() == 8, "Erased puyos must be added to the score.");
+    require(game.score() == 12, "Erased puyos must be added to the score.");
 
     require(
         game.board().at(Position{2, 0}) == Color::None,
@@ -329,7 +329,7 @@ void test_resolve_counts_groups_created_after_gravity() {
     require(
         result.erased_group_count == 2,
         "A group erased after gravity must increment the erased group count.");
-    require(game.score() == 8, "All erased puyos must be added to the score.");
+    require(game.score() == 12, "All erased puyos must be added to the score.");
 
     require(
         game.board().at(Position{3, 0}) == Color::None,
@@ -446,6 +446,113 @@ void test_gravity_moves_puyos_one_row_at_a_time() {
         "Gravity must stop when no puyo can fall.");
 }
 
+void test_simultaneous_groups_use_size_bonus_and_sorted_multipliers() {
+    Game game(4, 6);
+
+    for (int row = 2; row <= 3; ++row) {
+        spawn_and_lock(
+            game,
+            create_piece(
+                Position{row, 0},
+                Direction::Right,
+                Color::Red,
+                Color::Red));
+
+        spawn_and_lock(
+            game,
+            create_piece(
+                Position{row, 4},
+                Direction::Right,
+                Color::Blue,
+                Color::Blue));
+    }
+
+    spawn_and_lock(
+        game,
+        create_piece(
+            Position{2, 2},
+            Direction::Down,
+            Color::Red,
+            Color::Red));
+
+    const auto result = game.erase_once();
+
+    require(result.erased_count == 10,
+            "Six red and four blue puyos must be erased.");
+    require(result.erased_group_count == 2,
+            "Two groups must be erased.");
+    require(game.current_chain() == 1,
+            "Simultaneous groups must count as one chain.");
+    require(game.score() == 22,
+            "Simultaneous groups of four and six must score 22 points.");
+}
+
+void test_chain_multiplier_doubles_and_resets() {
+    Game game(6, 2);
+
+    // 赤を消すと青がつながり、青を消すと黄がつながる。
+    const Color rows[][2] = {
+        {Color::Red,    Color::Blue},
+        {Color::Red,    Color::Red},
+        {Color::Yellow, Color::Red},
+        {Color::Blue,   Color::Blue},
+        {Color::Blue,   Color::Yellow},
+        {Color::Yellow, Color::Yellow},
+    };
+
+    for (int row = 0; row < 6; ++row) {
+        spawn_and_lock(
+            game,
+            create_piece(
+                Position{row, 0},
+                Direction::Right,
+                rows[row][0],
+                rows[row][1]));
+    }
+
+    for (int chain = 1; chain <= 3; ++chain) {
+        const auto result = game.erase_once();
+
+        require(result.erased_count == 4,
+                "Each chain step must erase four puyos.");
+        require(game.current_chain() == chain,
+                "The chain count must increase once per erase step.");
+
+        const int expected_scores[] = {4, 12, 28};
+        require(game.score() == expected_scores[chain - 1],
+                "Chain multipliers must be one, two, and four.");
+
+        while (game.apply_gravity_one_row()) {
+        }
+    }
+
+    const auto finished = game.erase_once();
+
+    require(finished.erased_count == 0,
+            "No puyos must remain to erase.");
+    require(game.current_chain() == 0,
+            "The chain count must reset when no group remains.");
+
+    for (int row = 4; row <= 5; ++row) {
+        spawn_and_lock(
+            game,
+            create_piece(
+                Position{row, 0},
+                Direction::Right,
+                Color::Red,
+                Color::Red));
+    }
+
+    const auto next = game.erase_once();
+
+    require(next.erased_count == 4,
+            "The new group must erase four puyos.");
+    require(game.current_chain() == 1,
+            "A new sequence must start at chain one.");
+    require(game.score() == 32,
+            "The new sequence must add four points.");
+}
+
 }  // namespace
 
 int main() {
@@ -464,6 +571,8 @@ int main() {
         test_fall_is_rejected_when_a_fixed_piece_is_below();
         test_piece_separates_after_one_side_lands();
         test_gravity_moves_puyos_one_row_at_a_time();
+        test_simultaneous_groups_use_size_bonus_and_sorted_multipliers();
+        test_chain_multiplier_doubles_and_resets();
     } catch (const std::exception& error) {
         std::cerr << "Test failed: " << error.what() << '\n';
         return 1;

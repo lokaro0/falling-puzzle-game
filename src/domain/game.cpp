@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <vector>
+#include <algorithm>
+#include <limits>
 
 namespace puyopuyo {
 
@@ -23,6 +25,10 @@ bool Game::is_game_over() const noexcept {
 
 int Game::score() const noexcept {
     return score_;
+}
+
+int Game::current_chain() const noexcept {
+    return current_chain_;
 }
 
 bool Game::try_spawn(Piece piece) {
@@ -112,10 +118,25 @@ ResolutionResult Game::erase_once(
     const std::function<void(const std::vector<Position>&)>&
         on_erase_group
 ) {
-    ResolutionResult result;
-    const auto erasable_groups = find_erasable_groups();
+    return erase_once(find_erasable_groups(), on_erase_group);
+}
 
-    for (const auto& group : erasable_groups) {
+ResolutionResult Game::erase_once(
+    const std::vector<std::vector<Position>>& groups,
+    const std::function<void(const std::vector<Position>&)>&
+        on_erase_group
+) {
+    ResolutionResult result;
+
+    if (groups.empty()) {
+        current_chain_ = 0;
+        return result;
+    }
+
+    ++current_chain_;
+    std::vector<int> group_scores;
+
+    for (const auto& group : groups) {
         if (on_erase_group) {
             on_erase_group(group);
         }
@@ -126,9 +147,36 @@ ResolutionResult Game::erase_once(
         for (const Position position : group) {
             board_.at(position) = Color::None;
         }
+
+        const int count = static_cast<int>(group.size());
+
+        int group_score = 4;
+        for (int i = 5; i <= count; ++i) {
+            group_score += i - 3;
+        }
+
+        group_scores.push_back(group_score);
     }
 
-    score_ += result.erased_count;
+    std::sort(group_scores.begin(), group_scores.end());
+
+    int step_score = 0;
+    for (std::size_t i = 0; i < group_scores.size(); ++i) {
+        step_score += group_scores[i] * static_cast<int>(i + 1);
+    }
+
+    const int max_score = std::numeric_limits<int>::max();
+
+    for (int chain = 1; chain < current_chain_; ++chain) {
+        if (step_score > max_score / 2) {
+            step_score = max_score;
+            break;
+        }
+
+        step_score *= 2;
+    }
+
+    score_ += std::min(step_score, max_score - score_);
     return result;
 }
 

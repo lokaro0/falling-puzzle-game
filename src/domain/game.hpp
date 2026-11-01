@@ -36,6 +36,11 @@ public:
         const std::function<void(const std::vector<Position>&)>&
             on_erase_group = {}
     );
+    [[nodiscard]] ResolutionResult erase_once(
+        const std::vector<std::vector<Position>>& groups,
+        const std::function<void(const std::vector<Position>&)>&
+            on_erase_group = {}
+    );
 
     bool try_spawn(Piece piece);
     bool try_move(int row_delta, int col_delta);
@@ -43,15 +48,17 @@ public:
     bool try_rotate_clockwise();
     bool lock_active_piece();
     [[nodiscard]] bool apply_gravity_one_row();
+    [[nodiscard]] int current_chain() const noexcept;
+    [[nodiscard]] std::vector<std::vector<Position>> find_erasable_groups() const;
 
 private:
     [[nodiscard]] bool can_place(const Piece& piece) const;
-    [[nodiscard]] std::vector<std::vector<Position>> find_erasable_groups() const;
 
     Board board_;
     std::optional<Piece> active_piece_;
     bool game_over_ = false;
     int score_ = 0;
+    int current_chain_ = 0;
 };
 
 }  // namespace puyopuyo
