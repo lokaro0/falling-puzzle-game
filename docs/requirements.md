@@ -1,5 +1,7 @@
 # Falling Puzzle Game GUI版 要件定義
 
+2026-11-07の配布範囲：タイトルはStart / Quitのみ。High Score・Tutorialはコードを保持して非表示。Escはタイトル復帰確認、×は終了確認。新得点式・点滅・連鎖表示・メニュー移動／決定／着地／消去／Game Over音を実装。最大連鎖表示は延期。以下の完成形の要件や初期分析と区別し、現仕様は[基本設計](gui-implementation.md)を参照する。
+
 ## 目的
 
 本書は、[開発計画](project-plan.md)で定めた最初の正式版について、実装と受け入れ確認に必要な要件を定義する。既存仕様の詳細は[アーキテクチャ資料](architecture.md)と[リファクタリング記録](refactoring-plan.md)を参照する。

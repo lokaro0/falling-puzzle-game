@@ -1,5 +1,7 @@
 # Falling Puzzle Game GUI版 開発計画
 
+2026-11-07の配布範囲：タイトルはStart / Quitのみ。High Score・Tutorialはコードを保持して非表示。Escはタイトル復帰確認、×は終了確認。新得点式・点滅・連鎖表示・メニュー移動／決定／着地／消去／Game Over音を実装。最大連鎖表示は延期。以下の完成形の要件や初期分析と区別し、現仕様は[基本設計](gui-implementation.md)を参照する。
+
 ## 背景と目的
 
 現在のFalling Puzzle Gameは、C++17とncursesで動作する1人用の落ちものパズルゲームである。実行にLinuxまたはWSLとncursesが必要なため、開発環境を持たない利用者が遊びにくい。

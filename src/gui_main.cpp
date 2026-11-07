@@ -9,6 +9,7 @@
 #include <optional>
 #include <vector>
 #include <algorithm>
+#include <cmath>
 
 enum class Screen {
     Title,
@@ -63,6 +64,133 @@ int main() {
     SetTargetFPS(60);
     SetExitKey(KEY_NULL);
 
+    InitAudioDevice();
+    const bool audio_ready = IsAudioDeviceReady();
+
+    Sound land_sound{};
+    bool land_sound_ready = false;
+
+    Sound menu_sound{};
+    bool menu_sound_ready = false;
+
+    Sound confirm_sound{};
+    Sound game_over_sound{};
+    bool confirm_sound_ready = false;
+    bool game_over_sound_ready = false;
+
+    Sound erase_sound{};
+    bool erase_sound_ready = false;
+
+    if (audio_ready) {
+        const int sample_rate = 44100;
+        const int sample_count = 11025;
+        std::vector<float> samples(sample_count);
+
+        for (int i = 0; i < sample_count; ++i) {
+            const float time = static_cast<float>(i) / sample_rate;
+            const float envelope =
+                1.0f - static_cast<float>(i) / sample_count;
+
+            samples[i] =
+                0.15f * envelope
+                * std::sin(2.0f * 3.14159265f * 440.0f * time);
+        }
+
+        Wave wave{};
+        wave.frameCount = static_cast<unsigned int>(samples.size());
+        wave.sampleRate = sample_rate;
+        wave.sampleSize = 32;
+        wave.channels = 1;
+        wave.data = samples.data();
+
+        land_sound = LoadSoundFromWave(wave);
+        land_sound_ready = IsSoundValid(land_sound);
+
+        const int menu_sample_count = 2646;  // 0.06秒
+        samples.resize(menu_sample_count);
+
+        for (int i = 0; i < menu_sample_count; ++i) {
+            const float time = static_cast<float>(i) / sample_rate;
+            const float attack = std::min(time / 0.003f, 1.0f);
+            const float decay =
+                1.0f - static_cast<float>(i) / menu_sample_count;
+
+            samples[i] =
+                0.08f * attack * decay
+                * std::sin(2.0f * 3.14159265f * 880.0f * time);
+        }
+
+        wave.frameCount = static_cast<unsigned int>(samples.size());
+        wave.data = samples.data();
+
+        menu_sound = LoadSoundFromWave(wave);
+        menu_sound_ready = IsSoundValid(menu_sound);
+
+        const int erase_sample_count = 11025;  // 0.25秒
+        samples.resize(erase_sample_count);
+
+        float phase = 0.0f;
+
+        for (int i = 0; i < erase_sample_count; ++i) {
+            const float time = static_cast<float>(i) / sample_rate;
+            const bool first_note = time < 0.07f;
+
+            const float frequency = first_note ? 660.0f : 880.0f;
+            const float note_time = first_note ? time : time - 0.07f;
+            const float note_duration = first_note ? 0.07f : 0.18f;
+
+            const float attack = std::min(note_time / 0.004f, 1.0f);
+            const float decay = std::max(
+                1.0f - note_time / note_duration,
+                0.0f
+            );
+
+            samples[i] = 0.15f * attack * decay * (
+                std::sin(phase)
+                + 0.2f * std::sin(2.0f * phase)
+            );
+
+            phase += 2.0f * 3.14159265f * frequency / sample_rate;
+        }
+
+        wave.frameCount = static_cast<unsigned int>(samples.size());
+        wave.data = samples.data();
+
+        erase_sound = LoadSoundFromWave(wave);
+        erase_sound_ready = IsSoundValid(erase_sound);
+        const auto make_tone_sequence = [&](const std::vector<float>& notes,
+                                            float note_duration) {
+            const int note_samples = static_cast<int>(sample_rate * note_duration);
+            std::vector<float> sequence(note_samples * notes.size());
+            float phase = 0.0f;
+
+            for (std::size_t note = 0; note < notes.size(); ++note) {
+                for (int i = 0; i < note_samples; ++i) {
+                    const float time = static_cast<float>(i) / sample_rate;
+                    const float attack = std::min(time / 0.004f, 1.0f);
+                    const float decay = 1.0f - static_cast<float>(i) / note_samples;
+                    sequence[note * note_samples + i] =
+                        0.12f * attack * decay *
+                        (std::sin(phase) + 0.15f * std::sin(2.0f * phase));
+                    phase += 2.0f * 3.14159265f * notes[note] / sample_rate;
+                }
+            }
+
+            Wave sequence_wave{};
+            sequence_wave.frameCount = static_cast<unsigned int>(sequence.size());
+            sequence_wave.sampleRate = sample_rate;
+            sequence_wave.sampleSize = 32;
+            sequence_wave.channels = 1;
+            sequence_wave.data = sequence.data();
+            return LoadSoundFromWave(sequence_wave);
+        };
+
+        confirm_sound = make_tone_sequence({660.0f, 990.0f}, 0.06f);
+        confirm_sound_ready = IsSoundValid(confirm_sound);
+        game_over_sound = make_tone_sequence({330.0f, 261.625f, 196.0f}, 0.18f);
+        game_over_sound_ready = IsSoundValid(game_over_sound);
+    }
+
     const char* title = "FALLING PUZZLE GAME";
     const int title_font_size = 40;
     const int title_x =
@@ -70,11 +198,9 @@ int main() {
 
     const char* menu_items[] = {
         "Start",
-        "High Score",
-        "Tutorial",
         "Quit"
     };
-    const int menu_count = 4;
+    const int menu_count = 2;
     const int menu_font_size = 28;
 
     const char* hint = "Press Esc to return to title";
@@ -139,6 +265,7 @@ int main() {
     std::optional<puyopuyo::HighScoreStore> high_score_store;
 
     bool confirm_exit = false;
+    bool return_to_title = false;
 
     const char* exit_items[] = {"Yes", "No"};
     const int exit_count = 2;
@@ -167,6 +294,9 @@ int main() {
     bool new_high_score = false;
 
     const auto start_game = [&]() {
+        if (game_over_sound_ready) {
+            StopSound(game_over_sound);
+        }
         game = puyopuyo::Game(board_rows, board_cols);
 
         game.try_spawn(make_random_piece(board_cols, engine));
@@ -200,6 +330,7 @@ int main() {
                     exit_selected = 1;
                 }
 
+                return_to_title = !close_requested;
                 confirm_exit = true;
                 opened_exit_this_frame = true;
             } else {
@@ -218,16 +349,35 @@ int main() {
                 } else {
                     if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
                         exit_selected = (exit_selected + 1) % exit_count;
+                        if (menu_sound_ready) {
+                            PlaySound(menu_sound);
+                        }
                     }
 
                     if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
                         exit_selected =
                             (exit_selected + exit_count - 1) % exit_count;
+                            if (menu_sound_ready) {
+                                PlaySound(menu_sound);
+                            }
                     }
 
                     if (IsKeyPressed(KEY_ENTER)) {
+
+                        if (confirm_sound_ready) {
+
+                            PlaySound(confirm_sound);
+
+                        }
                         if (exit_selected == 0) {
-                            should_quit = true;
+                            if (return_to_title) {
+                                screen = Screen::Title;
+                                selected_index = 0;
+                                show_back_hint = false;
+                                confirm_exit = false;
+                            } else {
+                                should_quit = true;
+                            }
                         } else {
                             confirm_exit = false;
                         }
@@ -241,28 +391,32 @@ int main() {
         } else if (screen == Screen::Title) {
             if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
                 selected_index = (selected_index + 1) % menu_count;
+                if (menu_sound_ready) {
+                    PlaySound(menu_sound);
+                }
             }
 
             if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
                 selected_index =
                     (selected_index + menu_count - 1) % menu_count;
+                    if (menu_sound_ready) {
+                        PlaySound(menu_sound);
+                    }
             }
 
             if (IsKeyPressed(KEY_ENTER)) {
+
+                if (confirm_sound_ready) {
+
+                    PlaySound(confirm_sound);
+
+                }
                 switch (selected_index) {
                 case 0:
                     start_game();
                     break;
 
                 case 1:
-                    screen = Screen::HighScore;
-                    break;
-
-                case 2:
-                    screen = Screen::Tutorial;
-                    break;
-
-                case 3:
                     should_quit = true;
                     break;
                 }
@@ -307,6 +461,10 @@ int main() {
                     fall_elapsed = 0.0f;
 
                     if (result == puyopuyo::FallResult::Locked) {
+                        if (land_sound_ready) {
+                            PlaySound(land_sound);
+                        }
+
                         play_phase = PlayPhase::Gravity;
                         gravity_elapsed = 0.0f;
                     }
@@ -323,6 +481,7 @@ int main() {
                         if (!erase_groups.empty()) {
                             play_phase = PlayPhase::Erasing;
                             erase_elapsed = 0.0f;
+
                         } else {
                             // 空の対象を渡し、連鎖数をリセットする
                             (void)game.erase_once(erase_groups);
@@ -332,6 +491,9 @@ int main() {
                                 play_phase = PlayPhase::Falling;
                                 fall_elapsed = 0.0f;
                             } else {
+                                if (game_over_sound_ready) {
+                                    PlaySound(game_over_sound);
+                                }
                                 screen = Screen::GameOver;
                                 game_over_elapsed = 0.0f;
 
@@ -346,6 +508,16 @@ int main() {
 
                 if (erase_elapsed >= erase_duration) {
                     (void)game.erase_once(erase_groups);
+
+                    if (erase_sound_ready) {
+                        const int pitch_steps =
+                            std::min(game.current_chain() - 1, 4) * 3;
+
+                        const float pitch = std::pow(2.0f, pitch_steps / 12.0f);
+
+                        SetSoundPitch(erase_sound, pitch);
+                        PlaySound(erase_sound);
+                    }
 
                     erase_groups.clear();
                     erase_elapsed = 0.0f;
@@ -373,14 +545,26 @@ int main() {
         } else if (screen == Screen::Result) {
             if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
                 result_selected = (result_selected + 1) % result_count;
+                if (menu_sound_ready) {
+                    PlaySound(menu_sound);
+                }
             }
 
             if (IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_W)) {
                 result_selected =
                     (result_selected + result_count - 1) % result_count;
+                    if (menu_sound_ready) {
+                        PlaySound(menu_sound);
+                    }
             }
 
             if (IsKeyPressed(KEY_ENTER)) {
+
+                if (confirm_sound_ready) {
+
+                    PlaySound(confirm_sound);
+
+                }
                 if (result_selected == 0) {
                     start_game();
                 } else {
@@ -679,7 +863,8 @@ int main() {
                 Fade(BLACK, 0.75f)
             );
 
-            const char* question = "Quit the game?";
+            const char* question =
+                return_to_title ? "Return to title?" : "Quit the game?";
 
             DrawText(
                 question,
@@ -709,6 +894,29 @@ int main() {
         }
 
         EndDrawing();
+    }
+
+    if (land_sound_ready) {
+        UnloadSound(land_sound);
+    }
+
+    if (menu_sound_ready) {
+        UnloadSound(menu_sound);
+    }
+
+    if (erase_sound_ready) {
+        UnloadSound(erase_sound);
+    }
+
+    if (confirm_sound_ready) {
+        UnloadSound(confirm_sound);
+    }
+    if (game_over_sound_ready) {
+        UnloadSound(game_over_sound);
+    }
+
+    if (audio_ready) {
+        CloseAudioDevice();
     }
 
     CloseWindow();
