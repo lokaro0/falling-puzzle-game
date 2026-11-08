@@ -6,7 +6,11 @@ C++17で実装した、同色のブロックを4個以上つなげて消す落�
 
 動作する初版コードを分析し、ゲームロジック・画面表示・入力処理・ハイスコア保存を分離しました。ゲームロジックをncursesやファイルI/Oから独立させることで、自動テスト可能な構成に改善しています。
 
-## Windows GUI版（開発途中）
+## Windows GUI版（プレイ可能なプレビュー版）
+
+<img src="assets/gui-gameplay.png" alt="Windows GUI版のプレイ画面" width="600">
+
+現在の公開版は[v0.3.0-preview](https://github.com/lokaro0/falling-puzzle-game/releases/tag/v0.3.0-preview)です。タイトルからプレイ、結果表示、再挑戦までの流れに加え、連鎖・同時消しの得点計算、点滅・連鎖表示、効果音、ハイスコア保存を実装しています。
 
 ### ダウンロードと起動
 
@@ -39,9 +43,8 @@ C++17で実装した、同色のブロックを4個以上つなげて消す落�
 ハイスコアは`%LOCALAPPDATA%\FallingPuzzleGame\high_score.txt`へ保存され、次回起動時も保持されます。`High score storage unavailable`と表示された場合は、保存または読み込みに失敗しています。
 
 - 画面表示は英語です。
-- タイトルの選択肢はStart / Quitです。最高得点はタイトル・プレイ・結果画面で確認できます。専用High Score画面とTutorialは今後追加予定です。
-- 消去前の点滅、2連鎖目以降の連鎖表示、メニュー移動・決定・着地・消去・Game Overの効果音があります。最大連鎖表示は未実装です。
-- 重力処理の前後に短い待ち時間があります。
+- 最高得点はタイトル・プレイ・結果画面で確認できます。
+- ゲーム内チュートリアルはありません。操作方法はこのREADMEを参照してください。
 
 配布ZIPに第三者ソフトウェアのライセンス資料を同梱しています。
 
@@ -56,7 +59,7 @@ ctest --test-dir build/windows-gui --output-on-failure
 .\build\windows-gui\falling_puzzle_gui.exe
 ```
 
-MinGW-w64の`bin`をPATHへ追加してください。現環境では日本語を含むパスでビルド時の問題があったため、`C:\puyopuyo`のような英数字のパスを使用しています。
+MinGW-w64の`bin`をPATHへ追加してください。日本語を含むパスではビルドに失敗する場合があるため、`C:\puyopuyo`のような英数字のみのパスを推奨します。
 
 ## ncurses版
 
@@ -145,9 +148,7 @@ ctest --test-dir build/ubuntu --output-on-failure
 - `Game`：着地、出現位置探索、消去、段階的な重力、追加消去、片方だけが接地した場合の落下
 - `HighScoreStore`：ハイスコアの読み書きと異常入力
 
-`Game::resolve()`が返す`erased_group_count`は、1回の解決処理で消去された連結グループの累計です。一般的な落ちものパズルにおける連鎖段数とは異なります。
-
-GitHub Actionsでは、`main`へのpushとPull Requestごとに、Ubuntu 24.04上で設定、ビルド、テストを実行します。
+GitHub Actionsでは、`main`へのpushとPull Requestごとに、Ubuntu 24.04上でncurses版の設定・ビルドと、共通のゲームロジック・保存処理のテストを実行します。Windows GUI版のビルド、画面遷移・入力・描画・効果音の確認は、このCIの対象外です。
 
 ## 設計
 
