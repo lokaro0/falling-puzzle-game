@@ -2,15 +2,13 @@
 
 [![CI](https://github.com/lokaro0/falling-puzzle-game/actions/workflows/ci.yml/badge.svg)](https://github.com/lokaro0/falling-puzzle-game/actions/workflows/ci.yml)
 
-C++17で実装した、同色のブロックを4個以上つなげて消す落ちものパズルゲームです。Windows向けのraylib GUI版と、Linux／WSL向けのncurses版があります。
-
-動作する初版コードを分析し、ゲームロジック・画面表示・入力処理・ハイスコア保存を分離しました。ゲームロジックをncursesやファイルI/Oから独立させることで、自動テスト可能な構成に改善しています。
+同色のブロックを4個以上つなげて消す落ちものパズルゲームです。C++17を使用しており、Windows向けのraylib GUI版と、Linux／WSL向けのncurses版があります。
 
 ## Windows GUI版（プレイ可能なプレビュー版）
 
 <img src="assets/gui-gameplay.png" alt="Windows GUI版のプレイ画面" width="600">
 
-現在の公開版は[v0.3.0-preview](https://github.com/lokaro0/falling-puzzle-game/releases/tag/v0.3.0-preview)です。タイトルからプレイ、結果表示、再挑戦までの流れに加え、連鎖・同時消しの得点計算、点滅・連鎖表示、効果音、ハイスコア保存を実装しています。
+現在の公開版は[v0.3.0-preview](https://github.com/lokaro0/falling-puzzle-game/releases/tag/v0.3.0-preview)です。タイトルからプレイ、結果表示、再挑戦まで遊べるようになっており、連鎖・同時消しの得点計算、消滅時の点滅・連鎖表示、効果音、ハイスコア保存を実装しています。
 
 ### ダウンロードと起動
 
@@ -18,7 +16,7 @@ C++17で実装した、同色のブロックを4個以上つなげて消す落�
 2. ZIPをすべて展開します。
 3. 同梱DLLを実行ファイルと同じフォルダに置いたまま、`falling_puzzle_gui.exe`を起動します。
 
-対応環境はWindows 11 64bitです。開発環境のインストールは不要です。
+対応環境はWindows 11 64bitです。
 
 ### 操作
 
@@ -28,15 +26,9 @@ C++17で実装した、同色のブロックを4個以上つなげて消す落�
 | プレイ中 | `←` / `A`で左、`→` / `D`で右、`↓` / `S`で1段落下 |
 | 回転 | `R` / `Z`で時計回りに回転 |
 | プレイ中の確認 | `Esc`でタイトル復帰、×で終了の確認。Yesで実行、Noまたは`Esc`で再開 |
-| Game Over | 新しいキー入力で結果画面へ進む。演出中もスキップ可能 |
+| Game Over | 新しいキー入力で結果画面へ進む |
 
-移動と手動落下はキーを押すごとに1回動作します。終了確認中はゲームの進行が止まります。結果画面のRetryで再挑戦、Titleでタイトルへ戻れます。
-
-### 得点
-
-同色で上下左右につながった塊ごとに、最初の4個は各1点、5個目は2点、6個目は3点と加点します。同時に消える塊を基本点の小さい順に並べ、1倍・2倍・3倍……を掛けて合計します。さらに連鎖数に応じて1倍・2倍・4倍・8倍……を掛けます。
-
-例：3連鎖目に4個と6個の塊を消すと、(4 × 1 + 9 × 2) × 4 = 88点です。
+終了確認中はゲームの進行が止まります。結果画面のRetryで再挑戦、Titleでタイトルへ戻れます。
 
 ### 記録と現在の制限
 
@@ -50,61 +42,37 @@ C++17で実装した、同色のブロックを4個以上つなげて消す落�
 
 ### ソースからのビルド（Windows／MinGW-w64）
 
-C++17対応のMinGW-w64、CMake 3.20以上、Gitが必要です。リポジトリのルートで実行してください。raylib 5.5の固定コミットを初回設定時に取得するため、インターネット接続が必要です。
+C++17対応のMinGW-w64、CMake 3.20以上、Gitが必要です。以下の手順でリポジトリを取得してビルドします。取得済みの場合は、リポジトリのルートでCMakeのコマンドから実行してください。raylib 5.5の固定コミットを初回設定時に取得するため、インターネット接続が必要です。
+
+`g++` や `mingw32-make` が見つからない場合は、MinGW-w64の `bin` をPATHに追加してください。
 
 ```powershell
+git clone https://github.com/lokaro0/falling-puzzle-game.git
+cd falling-puzzle-game
+
 cmake -S . -B build/windows-gui -G "MinGW Makefiles" -DBUILD_NCURSES=OFF -DBUILD_GUI=ON -DBUILD_TESTING=ON -DCMAKE_BUILD_TYPE=Release
 cmake --build build/windows-gui --parallel 4
 ctest --test-dir build/windows-gui --output-on-failure
 .\build\windows-gui\falling_puzzle_gui.exe
 ```
 
-MinGW-w64の`bin`をPATHへ追加してください。日本語を含むパスではビルドに失敗する場合があるため、`C:\puyopuyo`のような英数字のみのパスを推奨します。
+日本語を含むパスではビルドに失敗する場合があるため、日本語を含まないパスを推奨します。
 
 ## ncurses版
 
-以下の特徴・実行手順・操作方法はターミナル版の説明です。
+Linux／WSLのターミナルで動作する版です。ゲームルールと得点計算はGUI版と共通です。
 
 ![ncurses版のゲーム画面](assets/gameplay.png)
 
-### 主な特徴
-
-- ランダムな2個組ブロックの生成
-- 次に出現する2個組ブロックの表示
-- 中央が塞がれている場合の上端における出現位置探索
-- 自然落下、左右移動、手動落下、時計回りの回転
-- 同色のブロックが4個以上つながった場合の消去
-- 消去時の点滅演出
-- 消去後の段階的な重力表示と追加消去
-- 片方だけが接地した場合の個別落下
-- スコアとハイスコアの表示・保存
-- ゲームオーバー判定
-- CTestによるゲームロジックと保存処理の自動テスト
-- GitHub ActionsによるUbuntu上での自動ビルド・テスト
-
-### 使用技術
-
-- C++17
-- CMake 3.20以上
-- ncurses
-- CTest
-- GitHub Actions
-- GCC／Clang
-
 ### ビルドと実行
 
-#### 必要な環境
-
-- C++17対応コンパイラ
-- CMake 3.20以上
-- ncurses
-- LinuxまたはWSL
+LinuxまたはWSLと、C++17対応コンパイラ、CMake 3.20以上、ncursesの開発用ライブラリ、Gitが必要です。
 
 Ubuntu／WSLでは、必要なパッケージを次のコマンドでインストールできます。
 
 ```bash
 sudo apt update
-sudo apt install -y build-essential cmake libncurses-dev
+sudo apt install -y build-essential cmake libncurses-dev git
 ```
 
 リポジトリを取得し、プロジェクトのルートディレクトリでビルドします。
@@ -121,21 +89,34 @@ cmake --build build/ubuntu --parallel
 ./build/ubuntu/puyopuyo
 ```
 
-### 操作方法
+### 操作
 
-| キー | 操作 |
+| 場面 | キーと動作 |
 |---|---|
-| `←` / `A` | 左へ移動 |
-| `→` / `D` | 右へ移動 |
-| `↓` / `S` | 手動で落下 |
-| `R` / `Z` | 時計回りに回転 |
-| `Q` | 終了 |
+| プレイ中 | `←` / `A`で左、`→` / `D`で右、`↓` / `S`で手動落下 |
+| 回転 | `R` / `Z`で時計回りに回転 |
+| 終了 | `Q`で終了 |
 
-ハイスコアは実行時に`data/high_score.txt`へ保存されます。このファイルは個人のプレイ記録であるため、Gitの管理対象から除外しています。
+### 記録
+
+ハイスコアは、ゲームを起動したときの作業ディレクトリを基準に `data/high_score.txt` に保存されます。
+
+## 共通ルール・得点
+
+- 2個組のブロックを移動・回転させて積み、同色のブロックを上下左右に4個以上つなげると消去されます。
+- 消去後に残ったブロックが落下し、再び消去が起こると連鎖になります。
+- 新しい2個組を盤面上端に配置できなくなるとゲームオーバーです。中央に置けない場合は、上端のほかの位置を探します。
+
+消去した塊の大きさを `n`（4以上）、連鎖数を `c`（1から）とします。同時に消えた塊の基本点を昇順に `b₁, b₂, …, bₖ` と並べます。
+
+- 塊の基本点：`4 + (n − 4)(n − 1) / 2`
+- 1回の消去で加わる得点：`(1 × b₁ + 2 × b₂ + … + k × bₖ) × 2^(c − 1)`
+
+例：3連鎖目に4個と6個の塊を消すと、(4 × 1 + 9 × 2) × 4 = 88点です。
 
 ## テスト
 
-ゲームロジックと保存処理のテストは両版で共通です。ncurses版のビルド後は次で実行します。GUI版のコマンドは上記Windowsビルド手順を参照してください。
+ゲームロジックと保存処理のテストは両版で共通です。手元で確認したい場合は、ビルド後にCTestで実行できます（プレイするだけなら不要です）。Windowsでの実行コマンドは上記のビルド手順に記載しています。Linux／WSLでは次のとおりです。
 
 ```bash
 ctest --test-dir build/ubuntu --output-on-failure
@@ -148,11 +129,11 @@ ctest --test-dir build/ubuntu --output-on-failure
 - `Game`：着地、出現位置探索、消去、段階的な重力、追加消去、片方だけが接地した場合の落下
 - `HighScoreStore`：ハイスコアの読み書きと異常入力
 
-GitHub Actionsでは、`main`へのpushとPull Requestごとに、Ubuntu 24.04上でncurses版の設定・ビルドと、共通のゲームロジック・保存処理のテストを実行します。Windows GUI版のビルド、画面遷移・入力・描画・効果音の確認は、このCIの対象外です。
+GUIの画面表示・入力・効果音は自動テストの対象外で、実機で動作確認しています。
 
 ## 設計
 
-ソースコードを次の責務に分離しています。
+初版からゲームロジック・画面表示・入力処理・ハイスコア保存を分離しました。ゲームロジックは画面表示やファイルI/Oに依存せず、raylib版とncurses版で共有しています。ソースコードの構成は次のとおりです。
 
 ```text
 src/
@@ -178,25 +159,8 @@ src/
 - 盤面のセル管理に`std::vector`を使用し、手動のメモリ管理を避ける
 - ncursesの開始と終了をRAIIで管理する
 - ハイスコアのファイルI/Oをゲーム規則から分離する
-- `main`には入力、更新、描画を組み合わせる役割だけを持たせる
+- ncurses版の `main.cpp` で入力・更新・描画を組み合わせ、raylib版の `gui_main.cpp` では画面遷移も管理する
 
 既存の層構造は[アーキテクチャ資料](docs/architecture.md)、GUI版の構成と実装計画は[基本設計](docs/gui-implementation.md)、ライブラリ選定理由は[ADR](docs/decisions/001-gui-library.md)に記録しています。
-
-## 初版を基準にした改善
-
-初版の動作を維持しながら、段階的に次の改善を行いました。
-
-- ゲームロジックとncurses処理の分離
-- 入力処理と画面描画の分離
-- ハイスコア保存処理の分離
-- 手動メモリ管理から`std::vector`への移行
-- ncursesセッションへのRAIIの導入
-- 片方だけが接地した場合の重力処理の修正
-- 初版の速度感を維持した落下間隔と、段階的な重力表示の追加
-- 次ピース表示、消去点滅、上端での出現位置探索の復元
-- 終了入力後に追加のゲーム更新が発生しないよう修正
-- ゲームロジックと保存処理の自動テスト追加
-- CMakeによるビルド手順の整備
-- GitHub Actionsによる継続的インテグレーションの追加
 
 改善内容と判断過程は[リファクタリング記録](docs/refactoring-plan.md)に記録しています。
